@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Генератор слов и выражений</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>🔤 Генератор слов, выражений и словосочетаний</h1>
+  <p class="subtitle">Выберите сферы жизни, тип лексики и количество — получите карточки со словами, описаниями, похожими словами, ссылками и картинками.</p>
+</header>
+
+<main>
+  <section class="controls">
+    <div class="control-group">
+      <h2>Сферы и области (чекбоксы)</h2>
+      <div id="domains" class="checkbox-grid"></div>
+      <div class="mini-actions">
+        <button type="button" id="selectAll">Выбрать все</button>
+        <button type="button" id="selectNone">Снять все</button>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <h2>Тип лексики</h2>
+      <div class="radio-row">
+        <label><input type="radio" name="wordType" value="all" checked> Все типы</label>
+        <label><input type="radio" name="wordType" value="word"> Только слова</label>
+        <label><input type="radio" name="wordType" value="phrase"> Выражения</label>
+        <label><input type="radio" name="wordType" value="collocation"> Словосочетания</label>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <h2>Количество карточек</h2>
+      <div class="count-row">
+        <input type="range" id="countRange" min="1" max="10" value="5">
+        <span id="countLabel">5</span>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <h2>Дополнительно</h2>
+      <label><input type="checkbox" id="noDuplicates" checked> Без повторов между генерациями</label>
+      <label><input type="checkbox" id="showImages" checked> Показывать картинки</label>
+    </div>
+
+    <button id="generateBtn" class="primary-btn">Сгенерировать ✨</button>
+  </section>
+
+  <section id="results" class="results"></section>
+</main>
+
+<footer>
+  <p>Данные хранятся локально в браузере. Картинки: <a href="https://picsum.photos" target="_blank">picsum.photos</a>. Информационные ресурсы: Википедия.</p>
+</footer>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
