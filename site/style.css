@@ -156,3 +156,13 @@ footer {
   color: #555;
 }
 footer a { color: #0645ad; }
+
+/* --- Живая генерация: скелетоны и бейдж источника --- */
+.badge-source { background: #eee; color: #555; }
+.card.skeleton { pointer-events: none; }
+.sk-img { height: 160px; background: linear-gradient(90deg,#f0f0f0 25%,#e6e6e6 50%,#f0f0f0 75%); background-size: 200% 100%; animation: shimmer 1.2s infinite; }
+.sk-body { padding: 14px 16px 18px; display: grid; gap: 10px; }
+.sk-line { height: 14px; border-radius: 6px; background: linear-gradient(90deg,#f0f0f0 25%,#e6e6e6 50%,#f0f0f0 75%); background-size: 200% 100%; animation: shimmer 1.2s infinite; }
+.w40 { width: 40%; } .w60 { width: 60%; } .w80 { width: 80%; }
+@keyframes shimmer { to { background-position: -200% 0; } }
+.primary-btn:disabled { opacity: .6; cursor: wait; }

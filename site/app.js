@@ -1,6 +1,19 @@
 const TYPE_LABELS = { word: "Слово", phrase: "Выражение", collocation: "Словосочетание" };
 const usedTerms = new Set(); // для режима «без повторов»
 
+// Живые темы для запросов к Википедии/Викисловарю по каждой сфере.
+// API-источники дают практически неограниченное число слов — локальный файл лишь стартовый набор.
+const LIVE_TOPICS = {
+  it: ["Программирование", "Информационные технологии", "Интернет", "Искусственный интеллект", "Компьютер"],
+  everyday: ["Быт", "Повседневная жизнь", "Дом", "Еда", "Семья"],
+  science: ["Наука", "Физика", "Химия", "Биология", "Астрономия"],
+  business: ["Экономика", "Бизнес", "Менеджмент", "Маркетинг", "Финансы"],
+  medicine: ["Медицина", "Здоровый образ жизни", "Кардиология", "Хирургия", "Психика"],
+  culture: ["Искусство", "Музыка", "Литература", "Кино", "Театр"],
+  sports: ["Спорт", "Футбол", "Олимпийские игры", "Лёгкая атлетика", "Плавание"],
+  travel: ["Туризм", "Путешествия", "Города", "Достопримечательности", "Транспорт"],
+};
+
 // --- Инициализация чекбоксов сфер ---
 const domainsBox = document.getElementById("domains");
 Object.entries(DOMAINS).forEach(([key, label]) => {
@@ -36,7 +49,22 @@ function shuffle(arr) {
   return a;
 }
 
-function generate() {
+function localCard(w, domainKey) {
+  return {
+    source: "local",
+    type: w.type,
+    term: w.term,
+    desc: w.desc,
+    related: w.related,
+    infoUrl: w.infoUrl,
+    articleUrl: w.articleUrl,
+    imgSeed: w.imgSeed,
+    imageUrl: null,
+    domainLabel: DOMAINS[domainKey],
+  };
+}
+
+async function generate() {
   const selected = getSelectedDomains();
   if (!selected.length) {
     showNotice("⚠️ Выберите хотя бы одну сферу (область) в чекбоксах.");
@@ -46,21 +74,106 @@ function generate() {
   const type = document.querySelector('input[name="wordType"]:checked').value;
   const count = Number(countRange.value);
   const noDup = document.getElementById("noDuplicates").checked;
+  const mode = document.querySelector('input[name="dataSource"]:checked').value; // local | live | mix
 
+  const btn = document.getElementById("generateBtn");
+  btn.disabled = true;
+  btn.textContent = "Генерация…";
+
+  try {
+    const cards = await buildCards({ selected, type, count, noDup, mode });
+    if (!cards.length) {
+      showNotice("😕 Не удалось собрать карточки. Попробуйте добавить сферы, сменить тип лексики или снять ограничение «без повторов».");
+      return;
+    }
+    render(cards);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Сгенерировать ✨";
+  }
+}
+
+async function buildCards({ selected, type, count, noDup, mode }) {
+  // Стартовый локальный пул
   let pool = WORDS_DB.filter(w => selected.includes(w.domain));
   if (type !== "all") pool = pool.filter(w => w.type === type);
-
   if (noDup) pool = pool.filter(w => !usedTerms.has(w.term));
+  pool = shuffle(pool);
 
-  if (!pool.length) {
-    showNotice("😕 По выбранным фильтрам слов не осталось. Попробуйте добавить сферы, сменить тип лексики или снять ограничение «без повторов».");
-    return;
+  const wantLocal = mode === "local" || mode === "mix";
+  const wantLive = mode === "live" || mode === "mix";
+
+  const cards = [];
+  if (wantLocal) {
+    for (const w of pool) {
+      if (cards.length >= count) break;
+      cards.push(localCard(w, w.domain));
+      if (noDup) usedTerms.add(w.term);
+    }
   }
 
-  const picked = shuffle(pool).slice(0, count);
-  if (noDup) picked.forEach(w => usedTerms.add(w.term));
+  // Подгружаем недостающее из живых источников (Википедия / Викисловарь)
+  if (wantLive && cards.length < count) {
+    showSkeleton(count - cards.length);
+    let attempts = 0;
+    while (cards.length < count && attempts < count * 5) {
+      attempts++;
+      const domain = selected[Math.floor(Math.random() * selected.length)];
+      const topics = LIVE_TOPICS[domain] || ["Наука"];
+      const topic = topics[Math.floor(Math.random() * topics.length)];
+      let card = null;
+      try {
+        // Иногда берём слово из Викисловаря — там именно лексика, а не статьи-имена собственные
+        if (Math.random() < 0.35) card = await nextDictCard(domain);
+        else card = await Api.buildCard(topic);
+      } catch (e) { continue; }
+      if (!card) continue;
+      if (type !== "all" && card.type !== type) continue;
+      if (noDup && usedTerms.has(card.term)) continue;
+      if (cards.some(c => c.term === card.term)) continue;
+      card.domainLabel = DOMAINS[domain];
+      cards.push(card);
+      if (noDup) usedTerms.add(card.term);
+    }
+  }
+  return cards;
+}
 
-  render(picked);
+// --- Кэш слов из Викисловаря: пачку случайных слов + определения грузим одним запросом ---
+let dictQueue = [];
+async function refillDictQueue() {
+  const terms = await Api.wiktRandomBatch(20);
+  if (!terms.length) throw new Error("empty wiktionary batch");
+  const defs = await Api.wiktDefinitions(terms);
+  dictQueue = terms
+    .filter(t => defs[t] && defs[t].length > 15)
+    .map(t => ({ term: t, def: defs[t] }));
+}
+
+async function nextDictCard(domain) {
+  if (!dictQueue.length) await refillDictQueue();
+  const idx = Math.floor(Math.random() * dictQueue.length);
+  const { term, def } = dictQueue.splice(idx, 1)[0];
+  const url = "https://ru.wiktionary.org/wiki/" + encodeURIComponent(term);
+  return {
+    source: "live-dict",
+    type: Api.classify(term),
+    term,
+    desc: def.slice(0, 400),
+    related: [],
+    infoUrl: url,
+    articleUrl: url,
+    imageUrl: null,
+    imgSeed: term,
+    domainLabel: DOMAINS[domain],
+  };
+}
+
+function showSkeleton(n) {
+  const results = document.getElementById("results");
+  results.innerHTML = Array.from({ length: n })
+    .map(() => `<div class="card skeleton"><div class="sk-img"></div><div class="sk-body"><div class="sk-line w40"></div><div class="sk-line w80"></div><div class="sk-line w60"></div></div></div>`)
+    .join("");
 }
 
 function showNotice(text) {
@@ -74,6 +187,8 @@ function esc(s) {
   return d.innerHTML;
 }
 
+const SOURCE_LABELS = { local: "Локальная база", live: "Википедия (онлайн)", "live-dict": "Викисловарь (онлайн)" };
+
 function render(items) {
   const showImages = document.getElementById("showImages").checked;
   const results = document.getElementById("results");
@@ -84,8 +199,19 @@ function render(items) {
     card.className = "card";
     card.style.animationDelay = `${idx * 0.08}s`;
 
-    const imgHtml = showImages
-      ? `<img class="card-img" src="https://picsum.photos/seed/${encodeURIComponent(w.imgSeed)}/640/300" alt="Иллюстрация к «${esc(w.term)}»" loading="lazy">`
+    // Картинка: для живых карточек — изображение из Википедии, для остальных — picsum по seed
+    let imgHtml = "";
+    if (showImages) {
+      const src = w.imageUrl ||
+        `https://picsum.photos/seed/${encodeURIComponent(w.imgSeed || w.term)}/640/300`;
+      imgHtml = `<img class="card-img" src="${esc(src)}" alt="Иллюстрация к «${esc(w.term)}»" loading="lazy">`;
+    }
+
+    const relatedHtml = (w.related && w.related.length)
+      ? `<div class="related">
+           <strong>Похожие и связанные слова:</strong>
+           ${w.related.map(r => `<button type="button" class="chip" title="Нажмите, чтобы скопировать">${esc(r)}</button>`).join("")}
+         </div>`
       : "";
 
     card.innerHTML = `
@@ -93,16 +219,14 @@ function render(items) {
       <div class="card-body">
         <div class="badges">
           <span class="badge badge-type">${TYPE_LABELS[w.type]}</span>
-          <span class="badge badge-domain">${DOMAINS[w.domain]}</span>
+          <span class="badge badge-domain">${esc(w.domainLabel || "")}</span>
+          <span class="badge badge-source">${SOURCE_LABELS[w.source] || ""}</span>
         </div>
         <h3 class="term">${esc(w.term)}</h3>
         <p class="desc">${esc(w.desc)}</p>
-        <div class="related">
-          <strong>Похожие и связанные слова:</strong>
-          ${w.related.map(r => `<button type="button" class="chip" title="Нажмите, чтобы скопировать">${esc(r)}</button>`).join("")}
-        </div>
+        ${relatedHtml}
         <div class="links">
-          <a href="${esc(w.infoUrl)}" target="_blank" rel="noopener">ℹ️ Информационный ресурс (Википедия)</a>
+          <a href="${esc(w.infoUrl)}" target="_blank" rel="noopener">ℹ️ Информационный ресурс</a>
           <a href="${esc(w.articleUrl)}" target="_blank" rel="noopener">📄 Статья по теме</a>
         </div>
       </div>`;

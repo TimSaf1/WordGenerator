@@ -42,6 +42,15 @@
     </div>
 
     <div class="control-group">
+      <h2>Источник слов</h2>
+      <div class="radio-row">
+        <label><input type="radio" name="dataSource" value="mix" checked> Микс: локальная база + онлайн (рекомендуется)</label>
+        <label><input type="radio" name="dataSource" value="live"> Только онлайн: Википедия и Викисловарь (тысячи слов)</label>
+        <label><input type="radio" name="dataSource" value="local"> Только локальная база (работает без интернета)</label>
+      </div>
+    </div>
+
+    <div class="control-group">
       <h2>Дополнительно</h2>
       <label><input type="checkbox" id="noDuplicates" checked> Без повторов между генерациями</label>
       <label><input type="checkbox" id="showImages" checked> Показывать картинки</label>
@@ -54,10 +63,13 @@
 </main>
 
 <footer>
-  <p>Данные хранятся локально в браузере. Картинки: <a href="https://picsum.photos" target="_blank">picsum.photos</a>. Информационные ресурсы: Википедия.</p>
+  <p>Онлайн-источники лексики: <a href="https://ru.wikipedia.org" target="_blank">Википедия (API)</a> и
+  <a href="https://ru.wiktionary.org" target="_blank">Викисловарь (API)</a> — слова подгружаются в реальном времени,
+  поэтому их практически бесконечное количество. Картинки: Wikipedia Commons / picsum.photos.</p>
 </footer>
 
 <script src="data.js"></script>
+<script src="api.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
