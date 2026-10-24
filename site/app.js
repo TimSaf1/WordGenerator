@@ -14,6 +14,14 @@ const LIVE_TOPICS = {
   travel: ["Туризм", "Путешествия", "Города", "Достопримечательности", "Транспорт"],
 };
 
+// Темы для цитат (Wikiquote) по сферам — дают крылатые выражения и фразеологию.
+const QUOTE_TOPICS = {
+  it: "программирование компьютер", everyday: "жизнь человек время",
+  science: "наука знания учёный", business: "бизнес деньги успех",
+  medicine: "здоровье врач жизнь", culture: "искусство музыка литература",
+  sports: "спорт победа", travel: "путешествия дорога странствие",
+};
+
 // --- Инициализация чекбоксов сфер ---
 const domainsBox = document.getElementById("domains");
 Object.entries(DOMAINS).forEach(([key, label]) => {
@@ -123,9 +131,14 @@ async function buildCards({ selected, type, count, noDup, mode }) {
       const topic = topics[Math.floor(Math.random() * topics.length)];
       let card = null;
       try {
-        // Иногда берём слово из Викисловаря — там именно лексика, а не статьи-имена собственные
-        if (Math.random() < 0.35) card = await nextDictCard(domain);
-        else card = await Api.buildCard(topic);
+        // Ротация живых источников: Википедия, рус./англ. Викисловарь, Wikiquote, Simple Wikipedia
+        const src = attempts % 6;
+        if (src === 0) card = await nextDictCard(domain);          // Викисловарь (ru)
+        else if (src === 1) card = await Api.buildCard(topic);      // Википедия (ru)
+        else if (src === 2) card = await nextEnDictCard(domain);    // Wiktionary (en)
+        else if (src === 3) card = await quoteCard(domain);         // Wikiquote (ru)
+        else if (src === 4) card = await simpleWikiToCard(domain);  // Simple English Wikipedia
+        else card = await dictApiCard(domain);                      // Free Dictionary + Datamuse
       } catch (e) { continue; }
       if (!card) continue;
       if (type !== "all" && card.type !== type) continue;
@@ -169,6 +182,101 @@ async function nextDictCard(domain) {
   };
 }
 
+// --- Английский Викисловарь: пачка случайных слов + определения одним запросом ---
+let enDictQueue = [];
+async function refillEnDictQueue() {
+  const terms = await Api.enWiktRandomBatch(20);
+  if (!terms.length) throw new Error("empty en-wiktionary batch");
+  const defs = await Api.enWiktDefinitions(terms);
+  enDictQueue = terms
+    .filter(t => defs[t] && defs[t].length > 15)
+    .map(t => ({ term: t, def: defs[t] }));
+}
+
+async function nextEnDictCard(domain) {
+  if (!enDictQueue.length) await refillEnDictQueue();
+  if (!enDictQueue.length) throw new Error("no usable en definitions");
+  const idx = Math.floor(Math.random() * enDictQueue.length);
+  const { term, def } = enDictQueue.splice(idx, 1)[0];
+  const url = "https://en.wiktionary.org/wiki/" + encodeURIComponent(term);
+  return {
+    source: "live-endict",
+    type: Api.classify(term),
+    term,
+    desc: def.slice(0, 400),
+    related: await Api.datamuseRelated(term).catch(() => []),
+    infoUrl: url,
+    articleUrl: url,
+    imageUrl: null,
+    imgSeed: term,
+    domainLabel: DOMAINS[domain],
+  };
+}
+
+// --- Wikiquote: крылатое выражение / цитата по сфере ---
+async function quoteCard(domain) {
+  const topic = QUOTE_TOPICS[domain] || "жизнь";
+  const { title, quote } = await Api.randomQuote(topic);
+  const url = "https://ru.wikiquote.org/wiki/" + encodeURIComponent(title);
+  // Термин — первая часть цитаты до тире/двоеточия (автор), либо вся цитата целиком
+  const m = quote.match(/^(.{10,90}?)(?:\s+[—:-]\s+.+)?$/u);
+  const term = (m ? m[1] : quote).replace(/[«»"“”]/g, "").trim();
+  return {
+    source: "live-quote",
+    type: "expression",
+    term: term.length > 90 ? term.slice(0, 87) + "…" : term,
+    desc: quote,
+    related: [],
+    infoUrl: url,
+    articleUrl: url,
+    imageUrl: null,
+    imgSeed: title,
+    domainLabel: DOMAINS[domain],
+  };
+}
+
+// --- Simple English Wikipedia: статья с простым определением ---
+async function simpleWikiToCard(domain) {
+  const { title, extract, url } = await Api.simpleWikiCard();
+  return {
+    source: "live-simple",
+    type: Api.classify(title),
+    term: title,
+    desc: extract,
+    related: await Api.datamuseRelated(title.split(" ")[0]).catch(() => []),
+    infoUrl: url,
+    articleUrl: url,
+    imageUrl: null,
+    imgSeed: title,
+    domainLabel: DOMAINS[domain],
+  };
+}
+
+// --- Free Dictionary API + Datamuse: английское слово из случайной пачки Wiktionary ---
+const COMMON_EN_WORDS = ["serendipity", "eloquent", "journey", "curiosity", "harmony",
+  "wisdom", "adventure", "silence", "gratitude", "horizon", "spark", "balance"];
+async function dictApiCard(domain) {
+  const word = COMMON_EN_WORDS[Math.floor(Math.random() * COMMON_EN_WORDS.length)];
+  const info = await Api.freeDictInfo(word);
+  if (!info || !info.definition) throw new Error("free dictionary miss");
+  const related = await Api.datamuseRelated(word).catch(() => []);
+  const parts = [info.definition];
+  if (info.example) parts.push("Пример: «" + info.example + "»");
+  if (info.phonetic) parts.unshift(info.phonetic + (info.partOfSpeech ? " · " + info.partOfSpeech : ""));
+  return {
+    source: "live-freedict",
+    type: "word",
+    term: word,
+    desc: parts.join("\n"),
+    related,
+    infoUrl: "https://www.merriam-webster.com/dictionary/" + encodeURIComponent(word),
+    articleUrl: "https://dictionaryapi.dev/",
+    imageUrl: null,
+    imgSeed: word,
+    domainLabel: DOMAINS[domain],
+  };
+}
+
 function showSkeleton(n) {
   const results = document.getElementById("results");
   results.innerHTML = Array.from({ length: n })
@@ -187,7 +295,15 @@ function esc(s) {
   return d.innerHTML;
 }
 
-const SOURCE_LABELS = { local: "Локальная база", live: "Википедия (онлайн)", "live-dict": "Викисловарь (онлайн)" };
+const SOURCE_LABELS = {
+  local: "Локальная база",
+  live: "Википедия (онлайн)",
+  "live-dict": "Викисловарь ru (онлайн)",
+  "live-endict": "Wiktionary en (онлайн)",
+  "live-quote": "Wikiquote (онлайн)",
+  "live-simple": "Simple Wikipedia (онлайн)",
+  "live-freedict": "Free Dictionary + Datamuse",
+};
 
 function render(items) {
   const showImages = document.getElementById("showImages").checked;

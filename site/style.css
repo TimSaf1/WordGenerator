@@ -166,3 +166,6 @@ footer a { color: #0645ad; }
 .w40 { width: 40%; } .w60 { width: 60%; } .w80 { width: 80%; }
 @keyframes shimmer { to { background-position: -200% 0; } }
 .primary-btn:disabled { opacity: .6; cursor: wait; }
+
+/* Примечание об источниках в футере */
+.src-note { font-weight: 600; color: #222; }
