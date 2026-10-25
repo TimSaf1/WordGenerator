@@ -187,3 +187,42 @@ footer a { color: #0645ad; }
 /* Ссылка на статью с названием статейника */
 .links a { text-decoration: none; border-bottom: 1px dotted #999; }
 .links a:hover { border-bottom-style: solid; }
+
+/* ===== Навигация-табы ===== */
+.tabs { display: flex; gap: 8px; margin: 10px 0 4px; }
+.tab { padding: 6px 14px; border: 1px solid #ddd; border-radius: 20px; text-decoration: none; color: #000; font-size: 15px; }
+.tab.active { background: #000; color: #fff; border-color: #000; }
+.nav-note { font-weight: bold; }
+
+/* ===== Страницы ===== */
+.page[hidden] { display: none; }
+
+/* ===== Карточка задачки ===== */
+.task-card { max-width: 760px; margin: 20px auto; border: 1px solid #ddd; border-radius: 10px; padding: 18px; background: #fff; }
+.task-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.badge.kind { background: #000; color: #fff; padding: 3px 10px; border-radius: 12px; font-size: 13px; }
+.hint-inline { color: #555; font-size: 14px; }
+.task-question { white-space: pre-wrap; font-family: inherit; font-size: 16px; margin: 0 0 12px; }
+.task-image img { max-width: 100%; border-radius: 8px; margin-bottom: 12px; }
+.task-card textarea { width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid #ccc; border-radius: 8px; font: inherit; resize: vertical; }
+.answer-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; }
+.file-label { cursor: pointer; border: 1px dashed #999; border-radius: 8px; padding: 6px 12px; font-size: 14px; }
+.file-label:hover { background: #f4f4f4; }
+.ghost-btn { background: #fff; border: 1px solid #000; color: #000; border-radius: 8px; padding: 8px 14px; cursor: pointer; }
+.ghost-btn.small, .primary-btn.small { padding: 6px 12px; font-size: 14px; }
+.file-thumbs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.file-chip { display: inline-flex; align-items: center; gap: 4px; border: 1px solid #ccc; border-radius: 8px; padding: 3px 6px; font-size: 13px; }
+.file-chip img { width: 42px; height: 42px; object-fit: cover; border-radius: 6px; }
+.file-chip button { border: none; background: none; cursor: pointer; font-size: 15px; }
+.hints-list { margin-top: 10px; }
+.hint-item { background: #fafafa; border-left: 3px solid #000; padding: 6px 10px; margin: 4px 0; border-radius: 0 6px 6px 0; font-size: 14px; }
+.verdict { margin-top: 14px; padding: 12px 14px; border-radius: 8px; font-size: 15px; }
+.verdict.pass { background: #eef7ee; border: 1px solid #9c9; }
+.verdict.fail { background: #fdf0f0; border: 1px solid #d99; }
+.verdict.reveal { background: #f5f5f5; border: 1px solid #bbb; }
+.ai-settings { max-width: 760px; margin: 14px auto; border: 1px solid #ddd; border-radius: 10px; padding: 14px 18px; }
+.ai-settings label { display: block; margin: 8px 0; font-size: 14px; }
+.ai-settings input[type=password], .ai-settings input[type=text], .ai-settings select { padding: 6px 8px; border: 1px solid #ccc; border-radius: 6px; min-width: 240px; }
+
+/* ===== Переводы ===== */
+.tr-word { font-size: 30px; font-weight: bold; margin: 8px 0; }

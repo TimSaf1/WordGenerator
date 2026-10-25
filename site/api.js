@@ -374,9 +374,62 @@ const Api = (() => {
     };
   }
 
+  // --- Случайная страница Википедии (для «Эрудито»: угадай, о чём статья) ---
+  async function wikiRandomPage(exclude = []) {
+    const d = await getJson(`${WIKI_API}?action=query&list=random` +
+      `&rnnamespace=0&rnlimit=${12 + exclude.length}&format=json&origin=*`);
+    const ms = (d?.query?.random || [])
+      .map(r => r.title)
+      .filter(t => t && !t.includes(":") && !exclude.includes(t));
+    if (!ms.length) throw new Error("wiki random empty");
+    return ms[Math.floor(Math.random() * ms.length)];
+  }
+
+  // --- Случайный объект Wikidata с русской подписью (для «Эрудито») ---
+  async function wikidataRandomEntity(exclude = []) {
+    for (let i = 0; i < 3; i++) {
+      const qid = "Q" + (100000 + Math.floor(Math.random() * 9500000));
+      if (exclude.includes(qid)) continue;
+      try {
+        const d = await getJson(`https://www.wikidata.org/wiki/Special:EntityData/${qid}.json`);
+        const ent = d?.entities?.[qid];
+        const label = ent?.labels?.ru?.value;
+        const desc = ent?.descriptions?.ru?.value;
+        if (!label || !desc) continue;
+        if (/^Q\d+$/.test(label)) continue; // недозаполненные элементы
+        let img = null;
+        try { img = await commonsImage(label); } catch (e) { /* без картинки тоже ок */ }
+        return { qid, label, desc, sitelink: ent?.sitelinks?.ruwiki ? "https://ru.wikipedia.org/wiki/" + encodeURIComponent(ent.sitelinks.ruwiki.title) : null, claims: ent?.claims || {}, imageUrl: img };
+      } catch (e) { /* следующий id */ }
+    }
+    throw new Error("wikidata random failed");
+  }
+
+  // --- Перевод слова через Wiktionary interlang links (для игры «Переводы») ---
+  // Возвращает { ru, en } — русское слово и его английский перевод.
+  async function pickTranslationPair() {
+    const terms = await wiktRandomBatch(20);
+    const defs = await guarded("wikt-defs", () => wiktDefinitions(terms.slice(0, 8)));
+    for (const term of terms) {
+      const def = defs[term] || "";
+      if (!def || def.length < 15) continue;
+      try {
+        const d = await getJson(`${DICT_API}?action=query&prop=langlinks&lllimit=1&lllang=en` +
+          `&redirects=1&titles=${encodeURIComponent(term)}&format=json&origin=*`);
+        const page = Object.values(d?.query?.pages || {})[0];
+        const en = page?.langlinks?.[0]?.title;
+        if (en && /^[a-zA-Z][a-zA-Z\s'-]{1,40}$/.test(en) && !/[а-яё]/i.test(term)) {
+          return { ru: term, en, def };
+        }
+      } catch (e) { /* следующее слово */ }
+    }
+    throw new Error("no translation pair found");
+  }
+
   return {
     buildCard, topicCard, wiktRandomBatch, wiktDefinitions, randomWikiTitle, classify,
     enWiktRandomBatch, enWiktDefinitions, randomQuote, simpleWikiCard,
     datamuseRelated, freeDictInfo, randomNews, randomWikidataItem, commonsImage,
+    wikiRandomPage, wikidataRandomEntity, pickTranslationPair,
   };
 })();

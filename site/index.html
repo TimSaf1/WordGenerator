@@ -9,10 +9,15 @@
 <body>
 <header>
   <h1>🔤 Генератор слов, выражений и словосочетаний</h1>
+  <nav class="tabs">
+    <a href="#generator" class="tab active" data-page="page-generator">Генератор слов</a>
+    <a href="#erudito" class="tab" data-page="page-erudito">🧠 Эрудито</a>
+    <a href="#translations" class="tab" data-page="page-translations">🌍 Переводы</a>
+  </nav>
   <p class="subtitle">Выберите сферы жизни, тип лексики и количество — получите карточки со словами, описаниями, похожими словами, ссылками и картинками.</p>
 </header>
 
-<main>
+<main id="page-generator" class="page">
   <section class="controls">
     <div class="control-group">
       <h2>Сферы и области (чекбоксы)</h2>
@@ -76,7 +81,98 @@
   <section id="results" class="results"></section>
 </main>
 
+<!-- ======================= СТРАНИЦА «ЭРУДИТО» ======================= -->
+<main id="page-erudito" class="page" hidden>
+  <section class="controls">
+    <div class="control-group">
+      <h2>Тема или свой промпт</h2>
+      <input type="text" id="erTopic" class="topic-input" placeholder="Например: космос, динозавры, Шекспир… — оставьте пустым для случайной темы">
+      <small class="hint">Задачка будет сгенерирована именно под эту тему (Википедия + Wikidata + Wikiquote + Викисловарь).</small>
+    </div>
+    <div class="control-group">
+      <h2>Тип задачки</h2>
+      <div class="radio-row">
+        <label><input type="radio" name="erKind" value="any" checked> Любая 🎲</label>
+        <label><input type="radio" name="erKind" value="word"> Угадай слово</label>
+        <label><input type="radio" name="erKind" value="article"> О чём статья?</label>
+        <label><input type="radio" name="erKind" value="algo"> Алгоритм / логика</label>
+        <label><input type="radio" name="erKind" value="image"> Что на картинке?</label>
+        <label><input type="radio" name="erKind" value="quote"> Цитата / выражение</label>
+      </div>
+    </div>
+    <div class="control-group">
+      <h2>Порог правильности: <span id="thrLabel">60</span>%</h2>
+      <input type="range" id="erThreshold" min="30" max="95" value="60">
+      <small class="hint">Если оценка ответа (офлайн-чек или ИИ) превысит порог — ты прав. Иначе даются ещё попытки.</small>
+    </div>
+    <button id="erNewBtn" class="primary-btn">Новая задачка 🧠</button>
+    <button id="erSettingsBtn" class="ghost-btn">⚙ Настройки ИИ-проверки</button>
+  </section>
+
+  <div id="erAiSettings" class="ai-settings" hidden>
+    <h3>ИИ-проверка (необязательно)</h3>
+    <p class="hint">Без ключа работает встроенный офлайн-анализатор (совпадение, нечёткое сравнение, ключевые слова). С ключом ответ оценивает настоящая модель и возвращает процент правильности суждения. Ключ хранится только в вашем браузере (localStorage).</p>
+    <label>Провайдер:
+      <select id="aiProvider"><option value="claude">Anthropic Claude</option><option value="openai">OpenAI</option></select>
+    </label>
+    <label>API-ключ: <input type="password" id="aiKey" placeholder="sk-ant-... или sk-..."></label>
+    <label>Модель: <input type="text" id="aiModel" placeholder="по умолчанию"></label>
+    <button id="aiSave" class="primary-btn small">Сохранить</button>
+    <span id="aiStatus" class="hint"></span>
+  </div>
+
+  <section id="erTask" class="task-card" hidden>
+    <div class="task-head"><span class="badge kind" id="erKindBadge"></span><span class="hint-inline" id="erScore"></span></div>
+    <div id="erImageBox" class="task-image" hidden><img id="erImage" alt="Картинка задачки"></div>
+    <pre id="erQuestion" class="task-question"></pre>
+    <textarea id="erAnswer" rows="4" placeholder="Напиши своё суждение / ответ здесь… Можно приложить файлы с кодом или картинки."></textarea>
+    <div class="answer-row">
+      <label class="file-label">📎 Прикрепить файлы (можно несколько)
+        <input type="file" id="erFiles" multiple hidden>
+      </label>
+      <button id="erCheckBtn" class="primary-btn small">Проверить ✔</button>
+      <button id="erHintBtn" class="ghost-btn small">💡 Подсказка</button>
+      <button id="erRevealBtn" class="ghost-btn small">Показать ответ</button>
+    </div>
+    <div id="fileThumbs" class="file-thumbs"></div>
+    <div id="erHints" class="hints-list"></div>
+    <div id="erVerdict" class="verdict" hidden></div>
+  </section>
+</main>
+
+<!-- ======================= СТРАНИЦА «ПЕРЕВОДЫ» ======================= -->
+<main id="page-translations" class="page" hidden>
+  <section class="controls">
+    <div class="control-group">
+      <h2>Язык перевода</h2>
+      <div class="radio-row">
+        <label><input type="radio" name="trLang" value="en" checked> Русский ⇄ Английский</label>
+      </div>
+      <small class="hint">Слова берутся из Викисловаря (живые данные) + локального словаря. Переводимое направление выбирается случайно.</small>
+    </div>
+    <div class="control-group">
+      <h2>Порог правильности: <span id="trThrLabel">60</span>%</h2>
+      <input type="range" id="trThreshold" min="30" max="95" value="60">
+    </div>
+    <button id="trNewBtn" class="primary-btn">Новое слово 🌍</button>
+  </section>
+
+  <section id="trCard" class="task-card" hidden>
+    <div class="task-head"><span class="badge kind">Перевод</span><span class="hint-inline" id="trStats"></span></div>
+    <div class="tr-word" id="trWord"></div>
+    <div class="hint" id="trPrompt"></div>
+    <textarea id="trAnswer" rows="2" placeholder="Напиши перевод и/или что это означает…"></textarea>
+    <div class="answer-row">
+      <button id="trCheckBtn" class="primary-btn small">Проверить ✔</button>
+      <button id="trHintBtn" class="ghost-btn small">💡 Подсказка</button>
+      <button id="trRevealBtn" class="ghost-btn small">Показать ответ</button>
+    </div>
+    <div id="trVerdict" class="verdict" hidden></div>
+  </section>
+</main>
+
 <footer>
+  <p class="nav-note">Разделы: Генератор слов · Эрудито (тренажёр эрудиции) · Переводы (игра)</p>
   <p class="src-note">Источники онлайн: Википедия · Викисловарь (ru/en) · Wikiquote · Simple English Wikipedia · Datamuse · Free Dictionary API · WikiNews · Wikidata · Wikimedia Commons</p>
   <p>Слова подгружаются из открытых API в реальном времени, поэтому их практически бесконечное количество.
   Все запросы идут параллельно — карточки появляются по мере готовности.</p>
@@ -88,5 +184,8 @@
 <script src="articles.js"></script>
 <script src="api.js"></script>
 <script src="app.js"></script>
+<script src="erudito.js"></script>
+<script src="translations.js"></script>
+<script src="pages.js"></script>
 </body>
 </html>
