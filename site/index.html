@@ -24,6 +24,20 @@
     </div>
 
     <div class="control-group">
+      <h2>Своя тема (строковый поиск)</h2>
+      <input type="text" id="topicInput" class="topic-input" list="topicSuggestions"
+        placeholder="Например: космос, кофе, котики, криптовалюты… — система подберёт слова под тему">
+      <datalist id="topicSuggestions">
+        <option value="космос"></option><option value="кофе"></option>
+        <option value="музыка"></option><option value="кулинария"></option>
+        <option value="криптовалюты"></option><option value="экология"></option>
+        <option value="фотография"></option><option value="йога"></option>
+        <option value="авто"></option><option value="модa"></option>
+      </datalist>
+      <small class="hint">Если тема заполнена — слова подбираются именно под неё (Википедия + Wikiquote + WikiNews + Wikidata). Можно совмещать с чекбоксами сфер.</small>
+    </div>
+
+    <div class="control-group">
       <h2>Тип лексики</h2>
       <div class="radio-row">
         <label><input type="radio" name="wordType" value="all" checked> Все типы</label>
@@ -63,12 +77,15 @@
 </main>
 
 <footer>
-  <p class="src-note">Источники онлайн: Википедия · Викисловарь (ru/en) · Wikiquote · Simple English Wikipedia · Datamuse · Free Dictionary API</p>
+  <p class="src-note">Источники онлайн: Википедия · Викисловарь (ru/en) · Wikiquote · Simple English Wikipedia · Datamuse · Free Dictionary API · WikiNews · Wikidata · Wikimedia Commons</p>
   <p>Слова подгружаются из открытых API в реальном времени, поэтому их практически бесконечное количество.
-  Картинки: Wikipedia Commons / picsum.photos.</p>
+  Все запросы идут параллельно — карточки появляются по мере готовности.</p>
+  <p>Картинки: главное изображение статьи → при отсутствии/ошибке загрузки автоматически берётся тематическое изображение из Wikimedia Commons или picsum.photos.
+  Ссылка «Статья» ведёт на тематические статейники: Хабр, N+1, VC.ru, WikiHow, РБК Тренды, ПостНаука, Colta, Чемпионат, Т—Ж и др.</p>
 </footer>
 
 <script src="data.js"></script>
+<script src="articles.js"></script>
 <script src="api.js"></script>
 <script src="app.js"></script>
 </body>

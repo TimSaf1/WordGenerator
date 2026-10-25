@@ -169,3 +169,21 @@ footer a { color: #0645ad; }
 
 /* Примечание об источниках в футере */
 .src-note { font-weight: 600; color: #222; }
+
+/* --- Поиск по своей теме --- */
+.topic-input {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 15px;
+  border: 1px solid #bbb;
+  border-radius: 6px;
+  background: #fff;
+  color: #111;
+  box-sizing: border-box;
+}
+.topic-input:focus { outline: 2px solid #555; border-color: #555; }
+.hint { display: block; margin-top: 6px; color: #555; font-size: 12.5px; }
+
+/* Ссылка на статью с названием статейника */
+.links a { text-decoration: none; border-bottom: 1px dotted #999; }
+.links a:hover { border-bottom-style: solid; }
