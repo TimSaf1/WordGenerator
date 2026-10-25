@@ -162,21 +162,51 @@ const Articles = (() => {
         }
       }
     }
-    if (best) {
-      return { name: `${best.site.name} → ${best.hub}`, url: best.site.url };
+    // Ссылка всегда привязана к конкретному слову/теме: формируем поисковый
+    // запрос по термину на выбранном статейнике, а не просто ссылку на сайт.
+    function hostOf(u) {
+      try { return new URL(u).hostname.replace(/^www\./, ""); }
+      catch (e) { return ""; }
     }
-    // не нашли тег — случайный раздел случайного сайта сферы
+    function searchUrl(site, hub) {
+      // очищаем термин от лишних пробелов/переносов
+      const clean = term.replace(/\s+/g, " ").trim();
+      const q = encodeURIComponent(clean);
+      // Yandex / Google работают с любым сайтом и гарантированно отдают
+      // статьи именно по теме термина
+      const engine = site.searchEngine || "yandex";
+      if (engine === "google") {
+        return `https://www.google.com/search?q=${encodeURIComponent(q + " " + (hub || site.name))}`;
+      }
+      // Яндекс-поиск по сайту (site:) — статьи только этого издания по теме
+      return `https://yandex.ru/search/?text=${q}&lr=213&family=yandex&site=${encodeURIComponent(hostOf(site.url))}`;
+    }
+
+    if (best) {
+      return {
+        name: `Статья «${term}» → ${best.site.name} (${best.hub})`,
+        url: searchUrl(best.site, best.hub),
+      };
+    }
+    // не нашли тег — поиск по термину на случайном сайте сферы
     if (sites.length) {
       const site = sites[Math.floor(Math.random() * sites.length)];
       const hubs = site.hubs || [];
-      if (hubs.length) {
-        const [hub] = hubs[Math.floor(Math.random() * hubs.length)];
-        return { name: `${site.name} → ${hub}`, url: site.url };
-      }
-      return { name: site.name, url: site.url };
+      const hub = hubs.length ? hubs[Math.floor(Math.random() * hubs.length)][0] : null;
+      return {
+        name: `Статья «${term}» → ${site.name}${hub ? " (" + hub + ")" : ""}`,
+        url: searchUrl(site, hub),
+      };
     }
     const fb = FALLBACK_ARTICLES[Math.floor(Math.random() * FALLBACK_ARTICLES.length)];
-    return fb;
+    // и для фолбэка — тематический поиск по термину на этом сайте
+    function fbHost(u) {
+      try { return new URL(u).hostname.replace(/^www\./, ""); } catch (e) { return ""; }
+    }
+    return {
+      name: `Статья «${term.replace(/\s+/g," ").trim()}» → ${fb.name}`,
+      url: `https://yandex.ru/search/?text=${encodeURIComponent(term.replace(/\s+/g," ").trim())}&site=${encodeURIComponent(fbHost(fb.url))}`,
+    };
   }
   return { pick };
 })();
