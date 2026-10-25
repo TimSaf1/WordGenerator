@@ -94,8 +94,12 @@
       <div class="radio-row">
         <label><input type="radio" name="erKind" value="any" checked> Любая 🎲</label>
         <label><input type="radio" name="erKind" value="word"> Угадай слово</label>
+        <label><input type="radio" name="erKind" value="describe"> Опиши своими словами</label>
         <label><input type="radio" name="erKind" value="article"> О чём статья?</label>
         <label><input type="radio" name="erKind" value="algo"> Алгоритм / логика</label>
+        <label><input type="radio" name="erKind" value="math"> Математика</label>
+        <label><input type="radio" name="erKind" value="physics"> Физика</label>
+        <label><input type="radio" name="erKind" value="code"> Программирование</label>
         <label><input type="radio" name="erKind" value="image"> Что на картинке?</label>
         <label><input type="radio" name="erKind" value="quote"> Цитата / выражение</label>
       </div>
@@ -125,7 +129,7 @@
     <div class="task-head"><span class="badge kind" id="erKindBadge"></span><span class="hint-inline" id="erScore"></span></div>
     <div id="erImageBox" class="task-image" hidden><img id="erImage" alt="Картинка задачки"></div>
     <pre id="erQuestion" class="task-question"></pre>
-    <textarea id="erAnswer" rows="4" placeholder="Напиши своё суждение / ответ здесь… Можно приложить файлы с кодом или картинки."></textarea>
+    <textarea id="erAnswer" rows="4" placeholder="Напиши своё суждение / ответ здесь… Каждый раз нужен НОВЫЙ уникальный текст (повторы не засчитываются). Можно приложить файлы с кодом или картинки."></textarea>
     <div class="answer-row">
       <label class="file-label">📎 Прикрепить файлы (можно несколько)
         <input type="file" id="erFiles" multiple hidden>
@@ -148,7 +152,15 @@
       <div class="radio-row">
         <label><input type="radio" name="trLang" value="en" checked> Русский ⇄ Английский</label>
       </div>
-      <small class="hint">Слова берутся из Викисловаря (живые данные) + локального словаря. Переводимое направление выбирается случайно.</small>
+    </div>
+    <div class="control-group">
+      <h2>Уровень слов</h2>
+      <div class="radio-row">
+        <label><input type="radio" name="trLevel" value="elementary"> Базовые (A1–A2)</label>
+        <label><input type="radio" name="trLevel" value="intermediate" checked> Средние (B1–B2)</label>
+        <label><input type="radio" name="trLevel" value="advanced"> Сложные / термины (C1+)</label>
+      </div>
+      <small class="hint">Слова берутся из официальных словарных источников: Викисловарь (категории частей речи), Simple English Wiki (базовый уровень), уточнение определений через Free Dictionary API. Локальная мини-база — только если нет сети.</small>
     </div>
     <div class="control-group">
       <h2>Порог правильности: <span id="trThrLabel">60</span>%</h2>

@@ -1,13 +1,19 @@
 // translations.js — игра «Переводы»: перевод слова с языка на язык +
 // ИИ/офлайн-проверка значения + подсчёт результата (серия, очки, точность).
-// Слова берутся из живых источников: Викисловарь (langlinks → английский
-// перевод), локальная база WORDS_DB (как fallback), случайные статьи Вики.
+// СЛОВА БЕРУТСЯ ИЗ ОФИЦИАЛЬНЫХ СЛОВАРНЫХ ИСТОЧНИКОВ:
+//   • Викисловарь (ru/en) — категории частей речи (частотный корпус языка);
+//   • Simple English Wikipedia — базовая лексика уровня A1–A2;
+//   • Free Dictionary API (Merriam-Webster consortium) — уточняющие определения;
+//   • локальная мини-база — только как офлайн-fallback.
+// Поддерживаются уровни: elementary / intermediate / advanced.
 
 const Translations = (() => {
   const state = {
-    round: null,        // {ru, en, def, dir}
+    round: null,        // {ru, en, def, dir, level, source}
     streak: 0, best: 0, solved: 0, total: 0,
     history: new Set(),
+    pairCache: [],      // пары из официального источника (батч), расходуем по одной
+    cacheKey: "",       // язык+уровень закэшированной пачки
   };
 
   function norm(s) {
@@ -15,7 +21,7 @@ const Translations = (() => {
       .replace(/[^a-zа-я0-9\s'-]/gi, "").replace(/\s+/g, " ").trim();
   }
 
-  // Локальные мини-словари для гарантированной игры без сети
+  // Локальные мини-словари — ТОЛЬКО если сеть недоступна
   const LOCAL_PAIRS = [
     { ru: "алгоритм", en: "algorithm", def: "точная последовательность шагов решения задачи" },
     { ru: "нейросеть", en: "neural network", def: "математическая модель, вдохновлённая мозгом" },
@@ -34,20 +40,44 @@ const Translations = (() => {
     { ru: "гравитация", en: "gravity", def: "притяжение тел друг к другу" },
   ];
 
-  async function newRound(lang) {
+  // Получить пару из официального источника (с кэшём батча — быстрый старт раундов)
+  async function officialPair(langCode, level) {
+    const key = langCode + ":" + level;
+    if (state.cacheKey !== key) { state.pairCache = []; state.cacheKey = key; }
+    // добираем батч, если кэш пуст или весь израсходован
+    while (!state.pairCache.length) {
+      const pairs = await Api.fetchTranslationBatch(langCode, level);
+      state.pairCache = pairs.filter(p => !state.history.has(norm(p.ru)));
+      if (!state.pairCache.length) break; // все уже были — попробуем новый батч ещё раз
+    }
+    if (!state.pairCache.length) throw new Error("no fresh official pairs");
+    return state.pairCache.shift();
+  }
+
+  async function newRound(langCode = "en", level = "intermediate") {
     let pair = null;
-    if (lang === "en") {
+    try {
+      pair = await officialPair(langCode === "en" ? "ru" : langCode, level);
+    } catch (e) {
+      // второй шанс: другой официальный путь — pickTranslationPair (random wikt)
       try {
-        for (let i = 0; i < 3 && !pair; i++) {
+        for (let i = 0; i < 2 && !pair; i++) {
           const p = await Api.pickTranslationPair();
           if (p && !state.history.has(norm(p.ru))) pair = p;
         }
-      } catch (e) { /* сеть недоступна — берём локальный словарь */ }
+      } catch (e2) { /* сеть недоступна */ }
     }
     if (!pair) {
       const pool = LOCAL_PAIRS.filter(p => !state.history.has(norm(p.ru)));
       const src = pool.length ? pool : LOCAL_PAIRS;
-      pair = src[Math.floor(Math.random() * src.length)];
+      pair = { ...src[Math.floor(Math.random() * src.length)], level: "offline", source: "Локальный словарь (нет сети)" };
+    }
+    // если определений нет — уточняем через Free Dictionary API (для англ. слова)
+    if ((!pair.def || pair.def.length < 12) && pair.en) {
+      try {
+        const fd = await Api.freeDictDefinition(pair.en);
+        if (fd?.def) pair.def = fd.def;
+      } catch (e) { /* ignore */ }
     }
     state.history.add(norm(pair.ru));
     const dir = Math.random() < 0.5 ? "ru2en" : "en2ru"; // куда переводим

@@ -105,8 +105,9 @@
       } else {
         const left = Math.max(0, 3 - Erudito.state.attempts);
         er.verdict.className = "verdict fail";
-        er.verdict.innerHTML = `❌ Пока неверно: <b>${r.percent}%</b> нужно ≥ ${er.thr.value}%.` +
-          (r.comment ? ` <i>${r.comment}</i>` : "") +
+        er.verdict.innerHTML = (r.duplicate
+          ? `🔁 <b>Ответ не засчитан:</b> ${r.comment || "текст должен быть уникальным"}`
+          : `❌ Пока неверно: <b>${r.percent}%</b> нужно ≥ ${er.thr.value}%.` + (r.comment ? ` <i>${r.comment}</i>` : "")) +
           (left > 0 ? ` Осталось попыток: <b>${left}</b>. Подумай и попробуй ещё раз, или возьми 💡 подсказку.` : ` Попытки кончились — нажми «Показать ответ» или возьми новую задачку.`);
       }
     } finally {
@@ -145,13 +146,15 @@
   async function newTrRound() {
     tr.newBtn.disabled = true; tr.newBtn.textContent = "Ищу слово…";
     tr.verdict.hidden = true;
+    const level = document.querySelector('input[name="trLevel"]:checked')?.value || "intermediate";
     try {
-      const round = await Translations.newRound("en");
+      const round = await Translations.newRound("en", level);
       tr.card.hidden = false;
       tr.word.textContent = round.dir === "ru2en" ? round.ru : round.en;
-      tr.prompt.textContent = round.dir === "ru2en"
+      tr.prompt.textContent = (round.dir === "ru2en"
         ? "Переведи это слово на английский и напиши, что оно означает."
-        : "Переведи это слово на русский и напиши, что оно означает.";
+        : "Переведи это слово на русский и напиши, что оно означает.") +
+        ` [уровень: ${({elementary:"базовый", intermediate:"средний", advanced:"сложный", offline:"офлайн"})[round.level] || round.level}; источник: ${round.source || "Викисловарь"}]`;
       tr.answer.value = "";
       updateTrStats();
     } finally {

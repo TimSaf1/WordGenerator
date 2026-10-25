@@ -405,6 +405,114 @@ const Api = (() => {
     throw new Error("wikidata random failed");
   }
 
+  // ===== Официальные словарные источники для игры «Переводы» =====
+  // Слова берутся из Викисловаря (ru/en), упрощённой Википедии (Simple English —
+  // базовая лексика, уровень A1–A2) и тематических категорий уровня
+  // («Категория:Русские существительные» и т.п.). Перевод тянется из
+  // межъязыковых ссылок (langlinks) + поля перевода статьи ru.wikt.
+
+  // Пачка случайных слов из категории указанного языка (официальный корпус)
+  async function wiktCategoryWords(langCode, limit = 20) {
+    const catMap = {
+      ru: ["Категория:Русские существительные", "Категория:Русские глаголы", "Категория:Русские прилагательные"],
+      en: ["Category:English nouns", "Category:English verbs", "Category:English adjectives"],
+      de: ["Category:German nouns", "Category:German verbs"],
+      fr: ["Category:French nouns", "Category:French verbs"],
+      es: ["Category:Spanish nouns", "Category:Spanish verbs"],
+    };
+    const cats = catMap[langCode] || catMap.ru;
+    const cat = cats[Math.floor(Math.random() * cats.length)];
+    const api = langCode === "ru" ? DICT_API : ENWIKT_API;
+    const d = await guarded("wikt-cat-" + langCode, () => getJson(
+      `${api}?action=query&list=categorymembers&cmtitle=${encodeURIComponent(cat)}` +
+      `&cmtype=page&cmlimit=${limit}&format=json&origin=*`), 3);
+    const words = (d?.query?.categorymembers || [])
+      .map(m => m.title)
+      .filter(t => t && /^[А-Яа-яЁёA-Za-z][А-Яа-яЁёa-z\- ]{2,20}$/i.test(t) && !t.includes(":"));
+    if (!words.length) throw new Error("empty category");
+    return words.sort(() => Math.random() - 0.5);
+  }
+
+  // Базовые слова уровня A1–A2: Simple English Wikipedia (упрощённый словарь)
+  async function basicLevelWords(limit = 12) {
+    const d = await guarded("simplewiki-basic", () => getJson(
+      `${SIMPLE_API}?action=query&list=random&rnnamespace=0&rnlimit=${limit}&format=json&origin=*`));
+    const titles = (d?.query?.random || []).map(r => r.title)
+      .filter(t => t && /^[a-z][a-z\s-]{2,25}$/i.test(t) && !t.includes("("));
+    if (!titles.length) throw new Error("no basic words");
+    return titles;
+  }
+
+  // Уровень слова по частотным признакам (эвристика по официальной базе):
+  // короткие общеупотребительные слова из Simple wiki → elementary,
+  // термины из категорий → intermediate/advanced
+  function estimateLevel(word, source) {
+    if (source === "basic") return "elementary";
+    const w = word.toLowerCase();
+    const common = /^(дом|вода|хлеб|день|нод|мать|отец|глаз|рука|город|друг|книга|время|человек|house|water|bread|day|mother|father|eye|hand|city|book|time)$/;
+    if (common.test(w)) return "elementary";
+    if (word.length > 9 || /[а-яё]аци|ость|ество|tion|ment|ness$/i.test(w)) return "advanced";
+    return "intermediate";
+  }
+
+  // Определение из Free Dictionary API (официальный Merriam-Webster consortium)
+  async function freeDictDefinition(word) {
+    try {
+      const d = await getJson(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word.toLowerCase())}`, 5000);
+      const meaning = Array.isArray(d) ? d[0]?.meanings?.[0] : null;
+      const def = meaning?.definitions?.[0]?.definition || "";
+      const pos = meaning?.partOfSpeech || "";
+      return def ? { def, pos } : null;
+    } catch (e) { return null; }
+  }
+
+  // Пары переводов пачкой: берём N слов категории + их определения одним
+  // batch-запросом + langlinks тоже батчем (1 запрос на всю пачку) — быстро.
+  async function fetchTranslationBatch(langCode, level) {
+    let words;
+    const src = level === "elementary" ? "basic" : "category";
+    if (src === "basic") {
+      words = await basicLevelWords(12);
+    } else {
+      words = await wiktCategoryWords(langCode === "ru" ? "ru" : langCode, 24);
+    }
+    if (level === "advanced") words = words.filter(w => w.length > 7).concat(words);
+    if (level === "elementary") words = words.filter(w => w.length <= 9).concat(words);
+    if (!words.length) throw new Error("no words for level");
+
+    const pairs = [];
+    // batch определений
+    let defs = {};
+    try { defs = await wiktDefinitions(words.slice(0, 10)); } catch (e) { /* ок без defs */ }
+    // batch langlinks (до 10 заголовков за один запрос)
+    let llMap = {};
+    try {
+      const api = langCode === "ru" ? DICT_API : ENWIKT_API;
+      const targetLang = langCode === "ru" ? "en" : "ru";
+      const d = await getJson(`${api}?action=query&prop=langlinks&lllang=${targetLang}&lllimit=1` +
+        `&redirects=1&titles=${encodeURIComponent(words.slice(0, 10).join("|"))}&format=json&origin=*`);
+      for (const page of Object.values(d?.query?.pages || {})) {
+        if (page?.langlinks?.[0]?.title) llMap[page.title] = page.langlinks[0].title;
+      }
+    } catch (e) { /* нет переводов — частично доберём ниже */ }
+
+    for (const w of words.slice(0, 10)) {
+      const tr = llMap[w];
+      const def = defs[w] || "";
+      if (!tr) continue;
+      if (!/^[А-Яа-яЁёA-Za-z][А-Яа-яЁёA-Za-z\s'’-]{1,40}$/.test(tr)) continue;
+      pairs.push({
+        ru: langCode === "ru" ? w : tr,
+        en: langCode === "ru" ? tr : w,
+        def: def || "",
+        level: estimateLevel(w, src),
+        source: src === "basic" ? "Simple English Wiki (базовый словарь)" : "Викисловарь (категории языка)",
+      });
+    }
+    if (!pairs.length) throw new Error("batch produced no pairs");
+    return pairs;
+  }
+
   // --- Перевод слова через Wiktionary interlang links (для игры «Переводы») ---
   // Возвращает { ru, en } — русское слово и его английский перевод.
   async function pickTranslationPair() {
@@ -431,5 +539,6 @@ const Api = (() => {
     enWiktRandomBatch, enWiktDefinitions, randomQuote, simpleWikiCard,
     datamuseRelated, freeDictInfo, randomNews, randomWikidataItem, commonsImage,
     wikiRandomPage, wikidataRandomEntity, pickTranslationPair,
+    wiktCategoryWords, basicLevelWords, fetchTranslationBatch, freeDictDefinition,
   };
 })();
